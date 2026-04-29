@@ -52,7 +52,3 @@ print(response)
 # for i, res in enumerate(results):
 #     print(f"\n--- Result {i+1} ---")
 #     print(res)
-
-# print("=========================results: =============================\n")
-# for r in results:
-#     print(r)
