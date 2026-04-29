@@ -26,7 +26,7 @@ vector_store.add(embeddings, chunks)
 
 
 # Query
-query = "Explain refund rules and conditions"
+query = "what about refunds?"
 
 response = rag_pipeline.generate_answer(query)
 
