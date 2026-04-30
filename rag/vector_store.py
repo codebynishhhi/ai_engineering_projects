@@ -1,33 +1,55 @@
 from typing import List
 import faiss
 import numpy as np
+from langchain.schema import Document
 
-# Retriever will use this vector class to find the top 3 vector chunks
+
 class VectorStore:
-    def __init__(self, dim:int):
-        # the FAISS index. "FlatL2" means it stores every vector exactly as it is and uses 
-        # Euclidean Distance (L2) to measure how far apart they are.
+    def __init__(self, dim: int):
+        """
+        dim: embedding dimension (e.g. 384 for all-MiniLM-L6-v2)
+        """
         self.index = faiss.IndexFlatL2(dim)
-        self.text_chunks = []
+        self.documents: List[Document] = []  # store full documents
 
+    # =====================================================
+    # ADD DOCUMENTS + EMBEDDINGS
+    # =====================================================
+    def add(self, embeddings: List[List[float]], documents: List[Document]):
+        """
+        embeddings: List of embedding vectors
+        documents: List of Document objects (same order as embeddings)
+        """
+        if len(embeddings) != len(documents):
+            raise ValueError("Embeddings and documents must have same length")
 
-    # add data chunk embeddings to the vector store database faiss
-    def add(self, embeddings : List[list[float]], chunks : List[str]):
-        vectors = np.array(embeddings).astype('float32')
+        vectors = np.array(embeddings).astype("float32")
+
         self.index.add(vectors)
-        self.text_chunks.extend(chunks)
+        self.documents.extend(documents)
 
-    # search for similar chunks based on the user query embedding
-    def search(self, query_embedding : list[float], top_k :int= 3):
-        query_vetor = np.array([query_embedding]).astype('float32')
-        
-        # distances, indices = self.index.search(query_vector, top_k)
-        # What’s happening: This is the heavy lifting. The computer calculates the distance between your question and every single chunk you ever added to the index.
-        # distances: Tells you how far away the matches are (smaller distance = more similar).
-        # indices: This is the crucial part. It returns the ID numbers (the positions) of the top_k (3) closest matches. For example, it might return [5, 12, 2].
+    # =====================================================
+    # SEARCH SIMILAR DOCUMENTS
+    # =====================================================
+    def search(self, query_embedding: List[float], top_k: int = 3) -> List[Document]:
+        """
+        Returns top_k most similar Document objects
+        """
+        if len(self.documents) == 0:
+            raise ValueError("Vector store is empty. Add documents before searching.")
 
-        distances, indices = self.index.search(query_vetor, top_k)
-        print(f"Distances: {distances}")
+        query_vector = np.array([query_embedding]).astype("float32")
+
+        distances, indices = self.index.search(query_vector, top_k)
+
+        print(f"\nDistances: {distances}")
         print(f"Indices: {indices}")
-        results = [self.text_chunks[i] for i in indices[0] ]
+
+        # indices shape: [[i1, i2, i3]]
+        results = []
+
+        for i in indices[0]:
+            if i < len(self.documents):  # safety check
+                results.append(self.documents[i])
+
         return results
