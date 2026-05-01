@@ -1,36 +1,33 @@
+from typing import List, Tuple
+import numpy as np
+from langchain.schema import Document
+
 class Reranker:
-    def __init__(self, llm):
-        self.llm = llm
+    def __init__(self, embedding_model):
+        self.embedding_model = embedding_model
 
-    def rerank(self, query, documents):
-        doc_texts = [doc.page_content for doc in documents]
+    def cosine_similarity(self, a, b):
+        a = np.array(a)
+        b = np.array(b)
+        if np.linalg.norm(a) == 0 or np.linalg.norm(b) == 0:
+            return 0.0
+        return np.dot(a,b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-        prompt = f"""
-        You are an expert at ranking documents based on relevance.
+    def rerank(self, user_query : str, documents : List[Document]) -> List[Tuple[Document, float]]:
+        """Reranks documents based on cosine similarity between user query and document content embeddings."""
 
-        Query:
-        {query}
+        # get the user query embedding
+        user_query_embedding = self.embedding_model.embed_query(user_query)
 
-        Documents:
-        """
+        scored_docs = []
 
-        for i, doc in enumerate(doc_texts):
-            prompt += f"\nDocument {i+1}:\n{doc}\n"
+        for doc in documents:
+            doc_embedding = self.embedding_model.embed_query(doc.page_content)
+            score = self.cosine_similarity(user_query_embedding, doc_embedding)
+            scored_docs.append((doc, score))
 
-        prompt += """
-        Rank the documents from most relevant to least relevant.
+        # sort by score in descending order
+        scored_docs.sort(key=lambda x: x[1], reverse=True)
 
-        Return ONLY the ranked document numbers like:
-        2,1,3
-        """
+        return scored_docs
 
-        response = self.llm.generate_llm_response(prompt)
-
-        try:
-            order = [int(x.strip()) - 1 for x in response.split(",")]
-        except:
-            return documents[:3]  # fallback
-
-        ranked_docs = [documents[i] for i in order if i < len(documents)]
-
-        return ranked_docs[:3]

@@ -1,5 +1,6 @@
 from rag.retriever import Retriever
 from rag.llm import LLMClient
+from rag.embedding import EmbeddingModel
 from rag.query_rewriter import QueryRewriter
 from rag.multi_query_generator import MultiQueryGenerator
 from rag.reranker import Reranker
@@ -10,9 +11,15 @@ class RAGPipeline:
     def __init__(self, retriever: Retriever):
         self.retriever = retriever
         self.llm = LLMClient()
+        self.embedding_model = EmbeddingModel()  # Assuming you have an embedding model
         self.query_rewriter = QueryRewriter(self.llm)
         self.multi_query_generator = MultiQueryGenerator(self.llm)
-        self.reranker = Reranker(self.llm)
+
+        # before reranking using llm
+        # self.reranker = Reranker(self.llm)
+
+        # now reranking with scores using embedding model
+        self.reranker = Reranker(self.embedding_model)
 
     def generate_answer(self, query: str) -> str:
 
@@ -63,16 +70,34 @@ class RAGPipeline:
         # =====================================================
         reranked_docs = self.reranker.rerank(rewritten_query, unique_docs)
 
+        # fetching only top k after reranking (e.g. top 3)
+        top_k = 2
+        reranked_docs = reranked_docs[:top_k]
+
+        # adding treshold check for relevance (e.g. only keep if score > 0.1)
+        THRESHOLD = 0.5
+        filtered_reranked_docs = [(doc, score) for doc, score in reranked_docs if score >= THRESHOLD]
+
+        if not filtered_reranked_docs:
+            print("No relevant documents found after reranking. Returning fallback answer.")
+            return "I don't know based on the provided data."
+
         # =====================================================
         # STEP 6 — Build Context (convert to string ONLY here)
         # =====================================================
-        context = "\n\n".join([doc.page_content for doc in reranked_docs])
+        context = "\n\n".join([doc.page_content for doc, _ in filtered_reranked_docs])
+
+        # logging the reranked doc with scores 
+        print("\n------------ Reranked Documents with Scores ---------------")
+        for i, (doc, score) in enumerate(filtered_reranked_docs):
+            print(f"\n----- Rerankd Doc {i+1} (Score : {score:4f})-------------------\n")
+            print(doc.page_content[:200])
 
         # =====================================================
         # STEP 7 — Build Prompt
         # =====================================================
         prompt = f"""
-        You are a helpful AI assistant.
+        You are a helpful and stict AI assistant.
 
         You must answer ONLY using the provided context.
 

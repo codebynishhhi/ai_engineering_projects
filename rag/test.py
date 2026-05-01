@@ -12,7 +12,7 @@ retriever = Retriever(vector_store, embedding_model=embedder)
 rag_pipeline = RAGPipeline(retriever)
 
 # step 3 : test with a query
-query = "What about refunds?"
+query = "payment successful refund"
 
 response = rag_pipeline.generate_answer(query)
 
