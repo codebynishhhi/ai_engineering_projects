@@ -4,6 +4,7 @@ from rag.embedding import EmbeddingModel
 from rag.vector_store import VectorStore
 from langchain.schema import Document
 from rag.utils.text_clean import clean_text
+from rag.keyword_retriever import KeywordRetriever
 
 def build_index():
     print("Starting indexing pipeline...")
@@ -13,6 +14,7 @@ def build_index():
     chunker = TextChunker()
     embedder = EmbeddingModel()
     vector_store = VectorStore(dim=384)
+    keyword_retriever = KeywordRetriever()
 
     # step 1: load and clean text
     text = loader.load("data/saas_doc.pdf")
@@ -33,7 +35,10 @@ def build_index():
     vector_store.add(embeddings, chunk_docs)
     print(f"Total Documents in Vector Store:\n {len(vector_store.documents)}")
 
-    return vector_store
+    # step 6 : fit keyword retriever
+    keyword_retriever.fit([doc.page_content for doc in chunk_docs])
+
+    return vector_store, keyword_retriever
 
 
 if __name__ == "__main__":

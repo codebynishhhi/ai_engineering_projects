@@ -4,12 +4,14 @@ from rag.embedding import EmbeddingModel
 from rag.query_rewriter import QueryRewriter
 from rag.multi_query_generator import MultiQueryGenerator
 from rag.reranker import Reranker
-
+from rag.keyword_retriever import KeywordRetriever
+from langchain.schema import Document
 
 class RAGPipeline:
 
-    def __init__(self, retriever: Retriever):
+    def __init__(self, retriever: Retriever, keyword_retriever: KeywordRetriever):
         self.retriever = retriever
+        self.keyword_retriever = keyword_retriever  # for initial retrieval before reranking
         self.llm = LLMClient()
         self.embedding_model = EmbeddingModel()  # Assuming you have an embedding model
         self.query_rewriter = QueryRewriter(self.llm)
@@ -36,12 +38,23 @@ class RAGPipeline:
         print(f"Multi Query Result: {multi_queries}")
 
         # =====================================================
-        # STEP 3 — Retrieve Documents (IMPORTANT: returns Document objects)
+        # STEP 3 — Retrieve Documents (IMPORTANT: returns Document objects) 
+        # retrieve documents/chunks based on vector semantic search & keyword search
         # =====================================================
         all_docs = []
         for q in multi_queries:
-            docs = self.retriever.retrieve(q, top_k=3)
-            all_docs.extend(docs)
+
+            # first vector search 
+            vector_docs = self.retriever.retrieve(q, top_k=3)
+
+            # keyword search returns string
+            keyword_docs = self.keyword_retriever.search(q, top_k=3)
+
+            # convert keyword docs to Document objects (assuming they are strings)
+
+            all_docs.extend(vector_docs)
+            all_docs.extend(keyword_docs)
+
 
         # Debug check (VERY IMPORTANT habit)
         if len(all_docs) > 0:
@@ -75,7 +88,7 @@ class RAGPipeline:
         reranked_docs = reranked_docs[:top_k]
 
         # adding treshold check for relevance (e.g. only keep if score > 0.1)
-        THRESHOLD = 0.5
+        THRESHOLD = 0.3
         filtered_reranked_docs = [(doc, score) for doc, score in reranked_docs if score >= THRESHOLD]
 
         if not filtered_reranked_docs:
