@@ -9,6 +9,7 @@ class QueryRewriter:
             - Do NOT add new information
             - Do NOT assume anything not in the query
             - Only make it clearer and more specific
+            "If the context does not explicitly mention a direct relationship,do not infer or assume connections."
             User query: {user_query}
             Rewritten query:
     

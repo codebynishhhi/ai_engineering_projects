@@ -5,8 +5,7 @@ from rag.query_rewriter import QueryRewriter
 from rag.multi_query_generator import MultiQueryGenerator
 from rag.reranker import Reranker
 from rag.keyword_retriever import KeywordRetriever
-from langchain.schema import Document
-
+from rag.utils.assign_metadata import detect_category
 class RAGPipeline:
 
     def __init__(self, retriever: Retriever, keyword_retriever: KeywordRetriever):
@@ -78,17 +77,30 @@ class RAGPipeline:
             print(f"===============Retrieved doc chunk {i+1}==================\n")
             print(doc.page_content[:200])
 
+        # before giving the docs to reranker detecting the category and adding metadata for better filtering
+        category = detect_category(rewritten_query)
+
+        if category:
+            filtered_docs = [
+                doc for doc in unique_docs
+                if doc.metadata.get("category") == category
+            ]
+        else :
+            print("⚠️ No docs after metadata filter, falling back to all docs")
+            filtered_docs = unique_docs  # if no category detected, use all docs
+
+
         # =====================================================
-        # STEP 5 — Rerank Documents
+        # STEP 5 — Rerank Documents - Semantic Search → Controlled Retrieval System
         # =====================================================
-        reranked_docs = self.reranker.rerank(rewritten_query, unique_docs)
+        reranked_docs = self.reranker.rerank(rewritten_query, filtered_docs)
 
         # fetching only top k after reranking (e.g. top 3)
         top_k = 2
         reranked_docs = reranked_docs[:top_k]
 
         # adding treshold check for relevance (e.g. only keep if score > 0.1)
-        THRESHOLD = 0.3
+        THRESHOLD = 0.2
         filtered_reranked_docs = [(doc, score) for doc, score in reranked_docs if score >= THRESHOLD]
 
         if not filtered_reranked_docs:

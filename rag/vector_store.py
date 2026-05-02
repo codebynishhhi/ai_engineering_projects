@@ -2,13 +2,15 @@ from typing import List
 import faiss
 import numpy as np
 from langchain.schema import Document
-
+import os
+import pickle
 
 class VectorStore:
     def __init__(self, dim: int):
         """
         dim: embedding dimension (e.g. 384 for all-MiniLM-L6-v2)
         """
+        # faiss index for efficient similarity search
         self.index = faiss.IndexFlatL2(dim)
         self.documents: List[Document] = []  # store full documents
 
@@ -53,3 +55,29 @@ class VectorStore:
                 results.append(self.documents[i])
 
         return results
+    
+    # =====================================================
+    # SAVE INDEX + DOCUMENTS
+    # =====================================================
+
+    def save(self, path :str = "artifacts"):
+        os.makedirs(path, exist_ok=True)
+        faiss.write_index(self.index, f"{path}/faiss.index")
+        with open(f"{path}/documents.pkl", "wb") as f:
+            pickle.dump(self.documents, f)
+
+        print(f"Vector store saved successfully!")
+
+    # ===================================================== 
+    # LOAD INDEX + DOCUMENTS
+    # =====================================================
+
+    def load(self, path : str = "artifacts"):
+        if not os.path.exists(f"{path}/faiss.index") or not os.path.exists(f"{path}/documents.pkl"):
+            raise FileNotFoundError("Index or documents not found. Please check the path.")
+
+        self.index = faiss.read_index(f"{path}/faiss.index")
+        with open(f"{path}/documents.pkl", "rb") as f:
+            self.documents = pickle.load(f)
+
+        print(f"Vector store loaded successfully!")
